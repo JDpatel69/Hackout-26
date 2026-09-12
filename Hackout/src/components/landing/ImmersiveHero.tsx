@@ -10,7 +10,6 @@ import {
   type MotionValue,
 } from 'framer-motion';
 import { ArrowRight, ChevronDown, Leaf, ShieldCheck, Sprout, CheckCircle2 } from 'lucide-react';
-import { SylvaLivingWorldScene } from '@designcodeio/threeui/components/SylvaLivingWorldScene';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { FloatingDock } from './FloatingDock';
 import './landing.css';
@@ -116,23 +115,11 @@ export function ImmersiveHero() {
   const reduced = useMediaQuery('(prefers-reduced-motion: reduce)');
   const isTablet = useMediaQuery('(max-width: 1024px)');
 
-  // Weaker devices: skip the WebGL iframe entirely, use the CSS fallback world.
-  const lowEnd = useMemo(() => {
-    if (typeof navigator === 'undefined') return false;
-    const nav = navigator as Navigator & { deviceMemory?: number };
-    const cores = nav.hardwareConcurrency ?? 8;
-    const mem = nav.deviceMemory ?? 8;
-    return cores < 4 || mem < 4;
-  }, []);
-
-  const renderScene = !lowEnd;
-  const parallaxOn = !reduced && !isTablet && renderScene;
+  const parallaxOn = !reduced && !isTablet;
 
   const { sx, sy } = usePointerParallax(parallaxOn);
 
-  // Per-layer depth: background drifts opposite the pointer; nearer cards move more.
-  const sceneX = useTransform(sx, (v) => v * -18);
-  const sceneY = useTransform(sy, (v) => v * -12);
+  // Per-layer depth: nearer cards move more.
   const leadX = useTransform(sx, (v) => v * -12);
   const leadY = useTransform(sy, (v) => v * -8);
   const metricX = useTransform(sx, (v) => v * 34);
@@ -145,27 +132,14 @@ export function ImmersiveHero() {
   return (
     <MotionConfig reducedMotion="user">
       <section className="tl-hero" aria-label="TerraLedger — verified climate impact">
-        {/* Layer 0 — the living environment */}
-        <motion.div
-          className="tl-hero__scene"
-          style={{ x: sceneX, y: sceneY }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1.1, ease: 'easeOut' }}
-        >
-          {renderScene ? (
-            <SylvaLivingWorldScene />
-          ) : (
-            <div className="tl-hero__scene--fallback" style={{ position: 'absolute', inset: 0 }} />
-          )}
-        </motion.div>
+        {/* 
+          Layer 0 — the living environment is now rendered globally by <GlobalBackground />.
+          The hero is transparent and sits on top of the fixed global scene.
+        */}
 
         {/* Layer 1 — atmosphere / legibility */}
         <div className="tl-hero__scrim tl-hero__scrim--edge" aria-hidden="true" />
         <div className="tl-hero__scrim tl-hero__scrim--top" aria-hidden="true" />
-
-        {/* Floating navigation dock (real TerraLedger routes) */}
-        <FloatingDock />
 
         {/* Layer 2 — editorial lead */}
         <div className="tl-hero__content">
@@ -257,6 +231,9 @@ export function ImmersiveHero() {
           Explore the platform <ChevronDown size={15} />
         </motion.div>
       </section>
+
+      {/* Floating navigation dock (moved outside tl-hero to avoid stacking context clipping) */}
+      <FloatingDock />
     </MotionConfig>
   );
 }

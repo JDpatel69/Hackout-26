@@ -29,7 +29,8 @@
   color: var(--tl-ink);
 }
 
-/* ---- Layer 0: the living 3D world ---------------------------------------- */
+/* ---- Layer 0: now rendered globally via GlobalBackground ---- */
+/* These styles kept for the global component's scene */
 .tl-hero__scene {
   position: absolute;
   /* bleed beyond the viewport so the world feels enormous / unbounded */
@@ -73,8 +74,7 @@
 }
 .tl-hero__scrim--edge {
   background:
-    linear-gradient(101deg, rgba(4, 14, 8, 0.9) 0%, rgba(4, 14, 8, 0.52) 32%, rgba(4, 14, 8, 0) 60%),
-    linear-gradient(to top, rgba(4, 14, 8, 0.82) 0%, rgba(4, 14, 8, 0) 34%);
+    linear-gradient(101deg, rgba(4, 14, 8, 0.9) 0%, rgba(4, 14, 8, 0.52) 32%, rgba(4, 14, 8, 0) 60%);
 }
 .tl-hero__scrim--top {
   background: linear-gradient(to bottom, rgba(4, 14, 8, 0.62) 0%, rgba(4, 14, 8, 0) 20%);
