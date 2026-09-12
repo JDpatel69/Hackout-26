@@ -1,0 +1,3 @@
+import type { ReactNode } from 'react';
+export function Tooltip({label,children}:{label:string;children:ReactNode}) { return <span title={label} aria-label={label}>{children}</span>; }
+export default Tooltip;

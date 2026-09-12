@@ -1,0 +1,2 @@
+export function Pagination({page=1,total=1,onChange}:{page?:number;total?:number;onChange?:(page:number)=>void}) { return <div className="list-item tiny"><button className="btn btn-ghost btn-sm" disabled={page<=1} onClick={()=>onChange?.(page-1)}>Previous</button><span>Page {page} of {total}</span><button className="btn btn-ghost btn-sm" disabled={page>=total} onClick={()=>onChange?.(page+1)}>Next</button></div>; }
+export default Pagination;

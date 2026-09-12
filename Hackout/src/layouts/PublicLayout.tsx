@@ -1,0 +1,2 @@
+import { Outlet, useLocation } from 'react-router-dom'; import { Navbar } from '../components/layout/Navbar'; import { Footer } from '../components/layout/Footer';
+export function PublicLayout(){const {pathname}=useLocation();const immersive=pathname==='/';return <div className="ambient public-layout"><i className="blob"/><i className="noise"/>{!immersive&&<header className="container"><Navbar/></header>}<main><Outlet/></main><Footer/></div>}
