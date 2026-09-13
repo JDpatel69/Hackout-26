@@ -10,6 +10,8 @@ from app.models import (
     CarbonProject,
     Farm,
     FarmDocument,
+    ImageAnalysis,
+    SensorVerification,
     User,
     VerificationRequest,
 )
@@ -128,14 +130,29 @@ async def approve_project(
     if not farm:
         raise HTTPException(status_code=404, detail="Farm not found")
 
-    dual = await run_dual_ai_verify(db, farm)
+    # Reuse existing AI results if the estimate endpoint was already called,
+    # to avoid a slow/redundant second dual-AI run on every approval click.
+    if req.image_analysis_id and req.sensor_verification_id and req.dual_ai_score is not None:
+        img = db.get(ImageAnalysis, req.image_analysis_id)
+        sv = db.get(SensorVerification, req.sensor_verification_id)
+        dual_ai_score = req.dual_ai_score
+        img_id = req.image_analysis_id
+        sv_id = req.sensor_verification_id
+        recommendation = "approve_ready"
+    else:
+        dual = await run_dual_ai_verify(db, farm)
+        dual_ai_score = dual.dualAiScore
+        img_id = dual.imageAnalysis.id
+        sv_id = dual.sensorVerification.id
+        recommendation = dual.recommendation
+
     notes = list(req.review_notes or [])
     if body.notes:
         notes.append({"authorId": user.id, "note": body.notes, "createdAt": now().isoformat()})
     notes.append(
         {
             "authorId": user.id,
-            "note": f"Approved with {body.verifiedCredits} tCO2e. Dual-AI score {dual.dualAiScore}.",
+            "note": f"Approved with {body.verifiedCredits} tCO2e. Dual-AI score {dual_ai_score}.",
             "createdAt": now().isoformat(),
         }
     )
@@ -145,9 +162,9 @@ async def approve_project(
     req.decision_at = now()
     req.decision_by = user.id
     req.review_notes = notes
-    req.image_analysis_id = dual.imageAnalysis.id
-    req.sensor_verification_id = dual.sensorVerification.id
-    req.dual_ai_score = dual.dualAiScore
+    req.image_analysis_id = img_id
+    req.sensor_verification_id = sv_id
+    req.dual_ai_score = dual_ai_score
     req.assigned_verifier_id = user.id
 
     farm.status = "approved"
@@ -162,7 +179,7 @@ async def approve_project(
         title=f"{farm.name} — Verified Algae Carbon",
         description=(
             f"Independently verified algae cultivation project at {farm.region}, {farm.country}. "
-            f"Species: {farm.algae_species or 'mixed'}. Dual-AI MRV score: {dual.dualAiScore}."
+            f"Species: {farm.algae_species or 'mixed'}. Dual-AI MRV score: {dual_ai_score}."
         ),
         region=f"{farm.region}, {farm.country}",
         images=list(farm.images or []) or ([farm.thumbnail_url] if farm.thumbnail_url else []),
@@ -173,13 +190,13 @@ async def approve_project(
         price_per_credit=round(price, 2),
         risk={
             "climateRisk": 28,
-            "verificationConfidence": int(dual.dualAiScore),
+            "verificationConfidence": int(dual_ai_score),
             "operatorTrackRecord": 70,
             "marketLiquidity": 55,
-            "composite": int((100 - 28 + dual.dualAiScore + 70 + 55) / 4),
-            "tier": "low" if dual.dualAiScore >= 75 else "medium",
+            "composite": int((100 - 28 + dual_ai_score + 70 + 55) / 4),
+            "tier": "low" if dual_ai_score >= 75 else "medium",
         },
-        expected_roi_percent=round(6.5 + dual.dualAiScore / 40.0, 2),
+        expected_roi_percent=round(6.5 + dual_ai_score / 40.0, 2),
         environmental_impact={
             "co2OffsetTonnes": body.verifiedCredits,
             "biodiversityScore": 72,

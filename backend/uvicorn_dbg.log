@@ -1,0 +1,84 @@
+INFO:     Started server process [5272]
+INFO:     Waiting for application startup.
+INFO:app.main:Database ready. Demo password for all users: password123
+INFO:app.ai.algae_image_model:TrainedAlgaeImageModel loaded from C:\Users\dharm\OneDrive\Desktop\Models\algae_segmentation.onnx (input=input tile=512 output=logits)
+INFO:app.ai.registry:Using ENABLED algae image model: algae_image_model
+INFO:app.ai.sensor_verify_model:TrainedSensorVerifyModel loaded from C:\Users\dharm\OneDrive\Desktop\Sensor_Node\Outputs\xgboost_biomass_model.pkl (features=['Irradiance', 'NO3', 'Temperature', 'pH', 'O2 Gas', 'CO2 Gas', 'Conductivity'])
+INFO:app.ai.registry:Using ENABLED sensor verify model: sensor_verify_model
+INFO:app.main:AI model status: {'image': {'name': 'algae_image_model', 'enabled_flag': True, 'ready': True, 'is_stub': False, 'path': './models/algae_image_model', 'url': None}, 'sensor': {'name': 'sensor_verify_model', 'enabled_flag': True, 'ready': True, 'is_stub': False, 'path': './models/sensor_verify_model', 'url': None}}
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:57812 - "POST /api/auth/signin HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57812 - "GET /api/ai/farms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57812 - "GET /api/iot/sensors/farm-bali?limit=1000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57812 - "POST /api/ai/sensor/verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57812 - "POST /api/ai/sensor/verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49296 - "POST /api/auth/signin HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49296 - "GET /api/ai/farms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49296 - "GET /api/ai/trust-score/farm-bali HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49296 - "POST /api/ai/dual-verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49296 - "GET /api/ai/trust-score/farm-bali HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49296 - "POST /api/ai/sensor/verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49296 - "GET /api/ai/trust-score/farm-bali HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49296 - "POST /api/ai/image/analyze/upload HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49296 - "GET /api/ai/trust-score/farm-bali HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57774 - "OPTIONS /api/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59928 - "OPTIONS /api/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57774 - "POST /api/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57503 - "POST /api/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57503 - "OPTIONS /api/ai/farms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57774 - "OPTIONS /api/ai/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59928 - "OPTIONS /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57643 - "OPTIONS /api/ai/farms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59928 - "GET /api/ai/farms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57774 - "GET /api/ai/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57774 - "GET /api/ai/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57643 - "OPTIONS /api/ai/trust-score/farm-andalucia HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59928 - "GET /api/ai/farms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57643 - "GET /api/ai/trust-score/farm-andalucia HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57503 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57503 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57503 - "POST /api/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57643 - "POST /api/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57503 - "GET /api/ai/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57643 - "GET /api/ai/farms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57503 - "GET /api/ai/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57643 - "GET /api/ai/farms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59928 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57774 - "GET /api/ai/trust-score/farm-andalucia HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59928 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55266 - "OPTIONS /api/ai/image/analyze/upload HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55266 - "POST /api/ai/image/analyze/upload HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55266 - "GET /api/ai/trust-score/farm-andalucia HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55266 - "OPTIONS /api/ai/dual-verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55266 - "POST /api/ai/dual-verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55266 - "POST /api/ai/dual-verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55266 - "POST /api/ai/dual-verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55266 - "POST /api/ai/dual-verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55266 - "POST /api/ai/dual-verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55266 - "POST /api/ai/dual-verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55266 - "POST /api/ai/dual-verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55266 - "POST /api/ai/dual-verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55266 - "POST /api/ai/dual-verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49481 - "GET /api/ai/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65181 - "GET /api/ai/farms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49481 - "GET /api/ai/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65181 - "GET /api/ai/farms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65181 - "GET /api/ai/trust-score/farm-andalucia HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51264 - "GET /api/ai/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64434 - "GET /api/ai/farms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58199 - "GET /api/ai/trust-score/farm-andalucia HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64434 - "GET /api/ai/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58199 - "GET /api/ai/farms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49160 - "GET /api/ai/trust-score/farm-andalucia HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56955 - "POST /api/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58466 - "POST /api/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58466 - "GET /api/ai/farms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59640 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56955 - "GET /api/ai/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59640 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58466 - "GET /api/ai/farms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51198 - "GET /api/ai/trust-score/farm-andalucia HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56955 - "GET /api/ai/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53300 - "POST /api/ai/image/analyze/upload HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53300 - "GET /api/ai/trust-score/farm-andalucia HTTP/1.1" 200 OK

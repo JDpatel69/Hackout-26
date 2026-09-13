@@ -10,6 +10,17 @@ python-multipart==0.0.12
 email-validator==2.2.0
 aiofiles==24.1.0
 httpx==0.27.2
-numpy==1.26.4
+numpy
 Pillow==10.4.0
 python-dateutil==2.9.0.post0
+
+# ── In-process AI model runtimes (AI Trust Score integration) ──────────────
+# Image model: ONNX segmentation net run via onnxruntime (avoids torch on 3.13).
+#   1.19.x has no cp313 wheel; 1.20+ does and supports numpy 2.x.
+# Sensor model: joblib-saved XGBoost regressor. Versions pinned to the exact
+#   training env (Sensor_Node/requirements.txt) so the .pkl unpickles cleanly.
+onnxruntime==1.30.0
+xgboost==3.4.1
+scikit-learn==1.9.1
+joblib==1.6.0
+pandas==3.0.5

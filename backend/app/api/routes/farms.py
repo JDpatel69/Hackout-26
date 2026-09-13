@@ -31,6 +31,19 @@ def _owned_farm(db: Session, farm_id: str, user: User) -> Farm:
     return farm
 
 
+# ── /farms/credits/me must be registered BEFORE /{farm_id} routes ──────────
+# (otherwise FastAPI would interpret "credits" as a farm_id value and 403/404)
+@router.get("/credits/me", response_model=List[CarbonCreditOut])
+def view_my_carbon_credits(
+    user: User = Depends(RoleFarm),
+    db: Session = Depends(get_db),
+) -> List[CarbonCreditOut]:
+    """Return all carbon credits for the authenticated operator's farms."""
+    farm_ids = [f.id for f in db.query(Farm).filter(Farm.operator_id == user.id).all()]
+    credits = db.query(CarbonCredit).filter(CarbonCredit.farm_id.in_(farm_ids)).all() if farm_ids else []
+    return [credit_out(c) for c in credits]
+
+
 @router.get("", response_model=List[FarmOut])
 def list_farms(
     user: User = Depends(RoleFarm),
@@ -226,14 +239,3 @@ def get_verification_status(
     return verification_out(req)
 
 
-@router.get("/operator/{operator_id}/credits", response_model=List[CarbonCreditOut])
-def view_carbon_credits(
-    operator_id: str,
-    user: User = Depends(RoleFarm),
-    db: Session = Depends(get_db),
-) -> List[CarbonCreditOut]:
-    if user.id != operator_id:
-        raise HTTPException(status_code=403, detail="Forbidden")
-    farm_ids = [f.id for f in db.query(Farm).filter(Farm.operator_id == operator_id).all()]
-    credits = db.query(CarbonCredit).filter(CarbonCredit.farm_id.in_(farm_ids)).all() if farm_ids else []
-    return [credit_out(c) for c in credits]

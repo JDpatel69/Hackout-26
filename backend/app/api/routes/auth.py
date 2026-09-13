@@ -2,14 +2,37 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.core.security import create_access_token, verify_password
+from app.core.security import create_access_token, verify_password, hash_password
 from app.database import get_db
 from app.models import User
-from app.schemas import AuthSessionOut, MessageOut, SignInRequest, UserOut
-from app.utils.ids import now
+from app.schemas import AuthSessionOut, MessageOut, SignInRequest, SignUpRequest, UserOut
+from app.utils.ids import now, new_id
 from app.utils.mappers import user_out
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.post("/signup", response_model=AuthSessionOut)
+def sign_up(body: SignUpRequest, db: Session = Depends(get_db)) -> AuthSessionOut:
+    email_lower = body.email.lower()
+    if db.query(User).filter(User.email == email_lower).first():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+    
+    user = User(
+        id=new_id(),
+        name=body.name,
+        email=email_lower,
+        hashed_password=hash_password(body.password),
+        role=body.role,
+        created_at=now(),
+        last_login_at=now()
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    token, expires = create_access_token(user.id, user.role)
+    return AuthSessionOut(user=user_out(user), token=token, expiresAt=expires)
 
 
 @router.post("/signin", response_model=AuthSessionOut)

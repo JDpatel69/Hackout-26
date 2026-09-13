@@ -4,14 +4,16 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.ai.registry import model_status
 from app.api.deps import RoleAny, RoleFarm, RoleResearcher, RoleVerifier, get_current_user
 from app.database import get_db
-from app.models import Farm, ImageAnalysis, SensorReading, SensorVerification, User
+from app.models import CarbonProject, Farm, ImageAnalysis, SensorReading, SensorVerification, User
 from app.schemas import (
+    AiFarmRefOut,
+    AiTrustScoreOut,
     DualAiVerifyOut,
     DualAiVerifyRequest,
     ImageAnalysisOut,
@@ -22,11 +24,20 @@ from app.schemas import (
     SensorVerificationOut,
     SensorVerifyRequest,
 )
-from app.services.ai_service import run_dual_ai_verify, run_image_analysis, run_sensor_verification
+from app.services.ai_service import (
+    get_trust_score,
+    run_dual_ai_verify,
+    run_image_analysis,
+    run_sensor_verification,
+)
 from app.utils.ids import new_id, now
 from app.utils.mappers import image_analysis_out, sensor_out, sensor_verification_out
 
 router = APIRouter(tags=["iot-ai"])
+
+# Roles permitted to *trigger* AI analysis. All authenticated roles may VIEW;
+# investor is view-only (per the locked "all view; limited run" access decision).
+RUN_ROLES = ("farm_operator", "verifier", "researcher")
 
 
 def _get_farm(db: Session, farm_id: str) -> Farm:
@@ -123,7 +134,7 @@ async def analyze_algae_image(
     Accepts a farm + image URL (drone/satellite/camera). Uses stub until
     AI_IMAGE_MODEL_ENABLED=true and trained weights are wired in.
     """
-    if user.role not in ("farm_operator", "verifier", "researcher"):
+    if user.role not in RUN_ROLES:
         raise HTTPException(status_code=403, detail="Role not allowed to run image analysis")
     farm = _get_farm(db, body.farmId)
     if user.role == "farm_operator" and farm.operator_id != user.id:
@@ -162,7 +173,7 @@ async def verify_sensor_data(
     Validates IoT readings for a time window and estimates sequestration.
     Stubbed until AI_SENSOR_MODEL_ENABLED=true.
     """
-    if user.role not in ("farm_operator", "verifier", "researcher"):
+    if user.role not in RUN_ROLES:
         raise HTTPException(status_code=403, detail="Role not allowed to run sensor verification")
     farm = _get_farm(db, body.farmId)
     cross: Optional[ImageAnalysis] = None
@@ -205,7 +216,7 @@ async def dual_verify(
     Run both AI models together and return a composite dual-AI score + recommendation.
     Primary path used by verifiers before approve/reject.
     """
-    if user.role not in ("verifier", "researcher", "farm_operator"):
+    if user.role not in RUN_ROLES:
         raise HTTPException(status_code=403, detail="Forbidden")
     farm = _get_farm(db, body.farmId)
     return await run_dual_ai_verify(
@@ -215,3 +226,69 @@ async def dual_verify(
         image_source=body.imageSource,
         window_hours=body.windowHours,
     )
+
+
+# ── AI Trust Score: unified view + real-image upload + farm selector ──────────
+@router.get("/ai/trust-score/{farm_id}", response_model=AiTrustScoreOut)
+def ai_trust_score(
+    farm_id: str,
+    _: User = Depends(RoleAny),
+    db: Session = Depends(get_db),
+) -> AiTrustScoreOut:
+    """Unified 'AI Trust Score' for a farm — readable by EVERY role (incl. investor).
+
+    Composites the latest stored image analysis + sensor verification. Returns
+    status='pending' (HTTP 200) when the farm has no AI analysis yet.
+    """
+    farm = _get_farm(db, farm_id)
+    return get_trust_score(db, farm)
+
+
+@router.post("/ai/image/analyze/upload", response_model=ImageAnalysisOut)
+async def analyze_algae_image_upload(
+    farmId: str = Form(...),
+    source: str = Form("phone"),
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ImageAnalysisOut:
+    """Model 1 — run image analysis on an UPLOADED photo (the real-image path).
+
+    Limited to run-capable roles; farm operators may only analyze their own farm.
+    """
+    if user.role not in RUN_ROLES:
+        raise HTTPException(status_code=403, detail="Role not allowed to run image analysis")
+    farm = _get_farm(db, farmId)
+    if user.role == "farm_operator" and farm.operator_id != user.id:
+        raise HTTPException(status_code=403, detail="Not your farm")
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file upload")
+    image_url = f"upload://{farm.id}/{file.filename or 'image'}"
+    row = await run_image_analysis(db, farm, image_url, source, image_bytes=data)
+    return image_analysis_out(row)
+
+
+@router.get("/ai/farms", response_model=List[AiFarmRefOut])
+def ai_farms(
+    user: User = Depends(RoleAny),
+    db: Session = Depends(get_db),
+) -> List[AiFarmRefOut]:
+    """Farms the caller may view on the AI Trust Score page.
+
+    operator → own farms; verifier/researcher → all; investor → farms that have a
+    published carbon project. Powers the page's farm selector uniformly.
+    """
+    if user.role == "farm_operator":
+        rows = db.query(Farm).filter(Farm.operator_id == user.id).order_by(Farm.name.asc()).all()
+    elif user.role == "investor":
+        rows = (
+            db.query(Farm)
+            .join(CarbonProject, CarbonProject.farm_id == Farm.id)
+            .order_by(Farm.name.asc())
+            .distinct()
+            .all()
+        )
+    else:  # verifier, researcher
+        rows = db.query(Farm).order_by(Farm.name.asc()).all()
+    return [AiFarmRefOut(id=f.id, name=f.name, status=f.status) for f in rows]

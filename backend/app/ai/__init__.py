@@ -29,6 +29,9 @@ class ImageModelInput:
     farm_area_hectares: Optional[float] = None
     algae_species: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    # Raw image bytes (e.g. from an upload). When present the model uses these
+    # directly instead of fetching image_url; enables the real-photo path.
+    image_bytes: Optional[bytes] = None
 
 
 @dataclass

@@ -12,11 +12,13 @@ from app.ai.registry import get_image_model, get_sensor_model
 from app.models import Farm, ImageAnalysis, SensorReading, SensorVerification
 from app.utils.ids import new_id, now
 from app.utils.mappers import image_analysis_out, sensor_out, sensor_verification_out
-from app.schemas import DualAiVerifyOut, ImageAnalysisOut, SensorVerificationOut
+from app.schemas import AiTrustScoreOut, DualAiVerifyOut, ImageAnalysisOut, SensorVerificationOut
 
 
 def _reading_dict(r: SensorReading) -> dict:
-    return sensor_out(r).model_dump(mode="json")
+    # Include raw_payload so the trained sensor model can read features that have
+    # no dedicated column (e.g. "CO2 Gas", "Conductivity"). The stub ignores it.
+    return {**sensor_out(r).model_dump(mode="json"), "rawPayload": r.raw_payload}
 
 
 async def run_image_analysis(
@@ -24,6 +26,7 @@ async def run_image_analysis(
     farm: Farm,
     image_url: str,
     source: str = "drone",
+    image_bytes: Optional[bytes] = None,
 ) -> ImageAnalysis:
     model = get_image_model()
     result = await model.predict(
@@ -33,6 +36,7 @@ async def run_image_analysis(
             source=source,
             farm_area_hectares=farm.area_hectares,
             algae_species=farm.algae_species,
+            image_bytes=image_bytes,
         )
     )
     row = ImageAnalysis(
@@ -140,6 +144,59 @@ async def run_sensor_verification(
     return row
 
 
+def compose_trust(
+    img: Optional[ImageAnalysis],
+    sen: Optional[SensorVerification],
+) -> tuple[float, str, list[str]]:
+    """Authoritative AI Trust Score composite → (dualAiScore, recommendation, notes).
+
+    Weighted blend: 40% image health, 25% image coverage, 25% sensor data quality,
+    10% image/sensor consistency. Robust to a missing side (neutral defaults + a
+    note) so the view surface can score a farm that only has one analysis so far.
+    """
+    health = img.health_score if img is not None else None
+    coverage = img.algae_coverage_pct if img is not None else None
+    bloom = bool(img.bloom_detected) if img is not None else False
+    img_flags = list(img.anomaly_flags or []) if img is not None else []
+
+    quality = sen.data_quality_score if sen is not None else None
+    consistency = sen.consistency_with_image if sen is not None else None
+    verdict = sen.verdict if sen is not None else None
+    sen_anom = list(sen.anomaly_details or []) if sen is not None else []
+
+    dual = round(
+        0.4 * (health if health is not None else 50)
+        + 0.25 * (coverage if coverage is not None else 50)
+        + 0.25 * (quality if quality is not None else 50)
+        + 0.1 * (consistency if consistency is not None else 70),
+        2,
+    )
+
+    notes: list[str] = []
+    if img is None:
+        notes.append("No image analysis yet — score uses a neutral image baseline.")
+    if sen is None:
+        notes.append("No sensor verification yet — score uses a neutral sensor baseline.")
+    if bloom:
+        notes.append("Image model flagged a possible bloom.")
+    if img_flags:
+        notes.extend([f"Image: {f}" for f in img_flags])
+    if sen_anom:
+        notes.extend([f"Sensor: {d}" for d in sen_anom])
+    if verdict == "suspicious":
+        notes.append("Sensor verifier verdict: suspicious — human review recommended.")
+    if verdict == "invalid":
+        notes.append("Sensor verifier verdict: invalid — reject recommended.")
+
+    if dual >= 75 and verdict == "plausible" and not bloom:
+        recommendation = "approve_ready"
+    elif verdict == "invalid" or dual < 45:
+        recommendation = "reject_recommended"
+    else:
+        recommendation = "needs_review"
+    return dual, recommendation, notes
+
+
 async def run_dual_ai_verify(
     db: Session,
     farm: Farm,
@@ -151,43 +208,49 @@ async def run_dual_ai_verify(
     img = await run_image_analysis(db, farm, url, image_source)
     sen = await run_sensor_verification(db, farm, window_hours=window_hours, cross_check_image=img)
 
-    # Composite dual-AI score (0-100)
-    img_score = (img.health_score or 50) * 0.35 + (img.algae_coverage_pct or 50) * 0.25
-    sen_score = (sen.data_quality_score or 50) * 0.25 + (sen.sequestration_confidence or 0.5) * 100 * 0.15
-    consistency_bonus = (sen.consistency_with_image or 70) * 0.1
-    dual = round(min(100.0, img_score * 0.6 / 0.6 + sen_score + consistency_bonus * 0.4), 2)
-    # simpler weighted blend:
-    dual = round(
-        0.4 * (img.health_score or 50)
-        + 0.25 * (img.algae_coverage_pct or 50)
-        + 0.25 * (sen.data_quality_score or 50)
-        + 0.1 * (sen.consistency_with_image or 70),
-        2,
-    )
-
-    notes: list[str] = []
-    if img.bloom_detected:
-        notes.append("Image model flagged a possible bloom.")
-    if img.anomaly_flags:
-        notes.extend([f"Image: {f}" for f in img.anomaly_flags])
-    if sen.anomaly_detected:
-        notes.extend([f"Sensor: {d}" for d in (sen.anomaly_details or [])])
-    if sen.verdict == "suspicious":
-        notes.append("Sensor verifier verdict: suspicious — human review recommended.")
-    if sen.verdict == "invalid":
-        notes.append("Sensor verifier verdict: invalid — reject recommended.")
-
-    if dual >= 75 and sen.verdict == "plausible" and not img.bloom_detected:
-        recommendation = "approve_ready"
-    elif sen.verdict == "invalid" or dual < 45:
-        recommendation = "reject_recommended"
-    else:
-        recommendation = "needs_review"
+    dual, recommendation, notes = compose_trust(img, sen)
 
     return DualAiVerifyOut(
         farmId=farm.id,
         imageAnalysis=image_analysis_out(img),
         sensorVerification=sensor_verification_out(sen),
+        dualAiScore=dual,
+        recommendation=recommendation,  # type: ignore[arg-type]
+        notes=notes,
+    )
+
+
+def get_trust_score(db: Session, farm: Farm) -> AiTrustScoreOut:
+    """Unified 'AI Trust Score' view read by every role (no model run).
+
+    Reads the latest stored ImageAnalysis + SensorVerification for the farm and
+    composes them. Returns status='pending' (still HTTP 200) when neither exists.
+    """
+    img = (
+        db.query(ImageAnalysis)
+        .filter(ImageAnalysis.farm_id == farm.id)
+        .order_by(ImageAnalysis.created_at.desc())
+        .first()
+    )
+    sen = (
+        db.query(SensorVerification)
+        .filter(SensorVerification.farm_id == farm.id)
+        .order_by(SensorVerification.created_at.desc())
+        .first()
+    )
+    if img is None and sen is None:
+        return AiTrustScoreOut(
+            farmId=farm.id,
+            status="pending",
+            notes=["No AI analysis has been run for this farm yet."],
+        )
+
+    dual, recommendation, notes = compose_trust(img, sen)
+    return AiTrustScoreOut(
+        farmId=farm.id,
+        status="ready",
+        imageAnalysis=image_analysis_out(img) if img is not None else None,
+        sensorVerification=sensor_verification_out(sen) if sen is not None else None,
         dualAiScore=dual,
         recommendation=recommendation,  # type: ignore[arg-type]
         notes=notes,

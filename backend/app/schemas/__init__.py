@@ -31,6 +31,13 @@ class SignInRequest(BaseModel):
     password: str
 
 
+class SignUpRequest(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+    role: UserRole
+
+
 class AuthSessionOut(BaseModel):
     user: UserOut
     token: str
@@ -237,6 +244,30 @@ class DualAiVerifyOut(BaseModel):
     notes: List[str]
 
 
+class AiTrustScoreOut(BaseModel):
+    """Unified 'AI Trust Score' view surface read by every role.
+
+    status="ready" when at least one stored analysis exists; "pending" when the
+    farm has neither an image analysis nor a sensor verification yet.
+    """
+
+    farmId: str
+    status: Literal["ready", "pending"]
+    imageAnalysis: Optional[ImageAnalysisOut] = None
+    sensorVerification: Optional[SensorVerificationOut] = None
+    dualAiScore: Optional[float] = None
+    recommendation: Optional[Literal["approve_ready", "needs_review", "reject_recommended"]] = None
+    notes: List[str] = Field(default_factory=list)
+
+
+class AiFarmRefOut(BaseModel):
+    """Lightweight farm reference for the AI Trust Score farm selector."""
+
+    id: str
+    name: str
+    status: str
+
+
 # ── Verification ──────────────────────────────────────────
 VerificationStatus = Literal["pending", "in_review", "approved", "rejected", "correction_required"]
 
@@ -263,7 +294,7 @@ class VerificationRequestOut(BaseModel):
 
 
 class ApproveRequest(BaseModel):
-    verifiedCredits: float = Field(gt=0)
+    verifiedCredits: float = Field(ge=0)
     notes: Optional[str] = None
 
 
